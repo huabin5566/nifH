@@ -1,0 +1,267 @@
+####################external_SESofiNST#######################################
+library(dplyr)
+library(tidyr)
+source("SES.r")
+otudata =  read.csv( "nifH_otu_rare_40.csv",row.names = 1,check.names = F)
+SES_list = SESfn(otudata)
+SES_value = SES_list[[1]] %>% as.data.frame()
+
+se <- function(x, na.rm = FALSE) {
+  sd(x, na.rm = na.rm) / sqrt(sum(!is.na(x)))
+}
+env =  read.csv( "nifH_env.csv",row.names = 1,check.names = F)
+env$ID = row.names(env)
+SESvalue_df <- as.data.frame(as.table(as.matrix(SESvalue)))
+names(SESvalue_df) <- c("Row", "Col", "SES")
+SES_df <- SESvalue_df %>%
+  mutate(Row_site = env$site[match(Row, env$ID)],
+         Col_site = env$site[match(Col, env$ID)])
+SESvalue_df <- SES_df[SES_df$Row_site == SES_df$Col_site, ]
+SESvalue_df = na.omit(SESvalue_df)
+df_SESvalue <- SESvalue_df %>%
+  group_by(Row_site) %>%
+  dplyr::summarise(SESvalue = mean(SES, na.rm = TRUE),
+                   SESvalue_SE = se(SES, na.rm = TRUE)
+  )   
+df_SESvalue = na.omit(df_SESvalue)
+colnames(df_SESvalue) <- c("site", "SES","SES_se")
+data_SESvalue <- merge(df_SESvalue,unique(env[,c("site","Biome")]), by = "site")
+aov(SES ~ Biome, data_SESvalue) %>% summary()
+df_SES <- data_SESvalue %>%
+  group_by(Biome) %>%
+  dplyr::summarise(SESvalue_mean = mean(SES, na.rm = TRUE),
+                   SESvalue_SE = se(SES, na.rm = TRUE))   
+
+library(RColorBrewer)
+colors <- brewer.pal(11, "Spectral") 
+colors <- colorRampPalette(colors)(23) 
+cropland_colors <- brewer.pal(5, "Blues")   
+forest_colors <- brewer.pal(5, "Reds")   
+grassland_colors <- brewer.pal(6, "Greens")
+shrubland_colors <- brewer.pal(3, "Purples")
+desert_colors <- brewer.pal(4, "Oranges")     
+colors <- c(
+  "Alpine cropland" = cropland_colors[5],
+  "Continental cropland" = cropland_colors[4],
+  "Dry cropland" = cropland_colors[3],
+  "Temperate cropland" = cropland_colors[2],
+  "Tropical cropland" = cropland_colors[1],
+  
+  "Alpine forest" = forest_colors[5],
+  "Continental forest" = forest_colors[4],
+  "Dry forest" = forest_colors[3],
+  "Temperate forest" = forest_colors[2],
+  "Tropical forest" = forest_colors[1],
+  
+  "Alpine grassland"= grassland_colors[6],
+  "Continental grassland" = grassland_colors[5],
+  "Dry grassland" = grassland_colors[4],
+  "Temperate grassland" = grassland_colors[3],
+  "Tropical grassland" = grassland_colors[2],
+  "Polar grassland" = grassland_colors[1],
+  
+  "Continental shrubland" = shrubland_colors[3],
+  "Dry shrubland" = shrubland_colors[2],
+  "Temperate shrubland" = shrubland_colors[1],
+  
+  "Alpine desert" = desert_colors[4],
+  "Continental desert" = desert_colors[3],
+  "Dry desert" = desert_colors[2],
+  "Temperate desert" = desert_colors[1]
+)
+df_SES$Biome <- factor(df_SES$Biome, levels = names(colors))
+P <- ggplot(data=df_SES, aes(x=Biome, y=SESvalue_mean, fill=Biome)) +
+  scale_fill_manual(values = colors) +
+  geom_bar(position=position_dodge(width = 0.8), stat="identity", colour="black", width = 0.6, size = 0.2) +
+  geom_errorbar(aes(ymin=SESvalue_mean-SESvalue_SE, ymax=SESvalue_mean+SESvalue_SE),
+                width=0.2, position=position_dodge(0.8), size = 0.2) +
+  
+  theme(
+    text = element_text(family = "Arial", size = 7), 
+    panel.grid = element_blank(), 
+    panel.border = element_rect(fill = NA, colour = 'black', size = 0.2), 
+    panel.background = element_rect(fill = '#FFFFFF'),
+    plot.title = element_text(size = 7, hjust = 0.5), 
+    plot.subtitle = element_text(size = 7, hjust = 0.5), 
+    axis.text = element_text(size = 7, color = 'black'), 
+    axis.title = element_text(size = 7, color = 'black'),
+    axis.text.x = element_text(angle = 90, hjust = 1),
+    axis.ticks = element_line(size = 0.2, color = "black"),  
+    legend.position = "none"
+  ) +
+  labs(x = NULL, y = "SES value")
+P
+
+#############################PERMDISP################################################
+source("iNST_fn.r")
+ext_data <- read.csv("nifH_env.csv", row.names = 1, check.names = FALSE)
+otudata <- read.csv("nifH_otu_rare_40.csv", row.names = 1, check.names = FALSE)
+ext_data$ID <- row.names(ext_data)
+envdata <- ext_data %>%
+  add_count(site) %>%
+  dplyr::filter(n >= 3) 
+sts <- unique(envdata$site)
+res_df <- data.frame()
+for (st in sts) {
+  envdf <- filter(envdata, site == st)
+  otu0 <- otudata[match(envdf$ID, row.names(otudata)), ]
+  otu <- otu0[, colSums(otu0) != 0]
+  set.seed(123)
+  obs <- Jobs_rc(otu, K = 999, eq = FALSE)
+  ran <- Jex_rc(otu, K = 999, eq = FALSE)
+  obs[lower.tri(obs)] <- t(obs)[lower.tri(obs)]
+  obs <- mutate(obs, gp = "obs")
+  ran[lower.tri(ran)] <- t(ran)[lower.tri(ran)]
+  rownames(ran) <- paste("ran", rownames(ran), sep = "")
+  colnames(ran) <- paste("ran", colnames(ran), sep = "")
+  ran <- mutate(ran, gp = "ran")
+  car <- full_join(obs, ran, by = "gp")
+  car[is.na(car)] <- 0
+  homo <- betadisper(as.dist(car[, -which(names(car) == "gp")]), car$gp, type = "centroid")
+  diff <- homo$group.distances[1] - homo$group.distances[2]
+  pm <- permutest(homo, iter = 999)
+  res <- mutate(pm[[1]][1,], site = st, diff = diff)
+  res_df <- rbind(res_df, res)
+}
+write.csv(res_df, "external_iNST.csv")
+##########################################SES.r#########################################
+SESfn=function(otu,K=999,eq=F){
+  sp=dim(otu)[2]
+  st=dim(otu)[1]
+  a=otu>0
+  
+  alpha=apply(a,1,sum)
+  SSobs=a%*%t(a)
+  Jobs=matrix(-1,st,st)
+  for (i in 1:st){
+    for (j in i:st) {
+      Jobs[i,j]=SSobs[i,j]/(alpha[i]+alpha[j]-SSobs[i,j])
+    }
+  }
+  colnames(Jobs)=row.names(otu)
+  row.names(Jobs)=row.names(otu)
+  #write.csv(Jobs,file="observed.csv")
+  
+  pool=sum(apply(a,2,sum)>0)
+  occ=apply(a,2,sum)
+  
+  J=matrix(0,K,st*st)
+  
+  if (eq==F) {
+    for (k in 1:K){
+      Ran=matrix(0,st,pool)
+      for (i in 1:st) Ran[i,sample(1:pool,as.numeric(alpha[i]),prob=occ[occ>0])]<-T
+      SSran=Ran%*%t(Ran)
+      Jran=matrix(-1,st,st)
+      for (i in 1:st){
+        for (j in i:st) Jran[i,j]=SSran[i,j]/(alpha[i]+alpha[j]-SSran[i,j])
+      }
+      J[k,]=as.vector(Jran)
+    }
+
+  }
+  
+  if (eq==T) {
+    for (k in 1:K){
+      Ran=matrix(0,st,pool)
+      for (i in 1:st) Ran[i,sample(1:pool,as.numeric(alpha[i]))]<-T
+      SSran=Ran%*%t(Ran)
+      Jran=matrix(-1,st,st)
+      for (i in 1:st){
+        for (j in i:st) Jran[i,j]=SSran[i,j]/(alpha[i]+alpha[j]-SSran[i,j])
+      }
+      J[k,]=as.vector(Jran)
+    }
+  }
+  
+  
+  if (eq==T) name="Mean_equal.csv" else name="Mean_unequal.csv"
+  Jex=matrix(apply(J,2,mean),st,st)
+  colnames(Jex)=row.names(otu)
+  row.names(Jex)=row.names(otu)
+
+  if (eq==T) name="SD_equal.csv" else name="SD_unequal.csv"
+  exp=matrix(apply(J,2,sd),st,st)
+  colnames(exp)=row.names(otu)
+  row.names(exp)=row.names(otu)
+  SES= (Jobs-Jex)/exp
+  SS=(Jobs-Jex)/Jobs
+  oneSS=1-SS
+  
+  
+  SES[is.infinite(SES)|!upper.tri(SES,diag = F)]<-NA
+  SS[is.infinite(SS)|!upper.tri(SS,diag = F)]<-NA
+  oneSS[is.infinite(oneSS)|!upper.tri(oneSS,diag = F)]<-NA
+  
+  
+  list(SES,SS,oneSS)
+}
+
+############################################iNST_fn.r############################################
+Jobs_rc=function(otudf,K,eq){
+  sp=dim(otudf)[2]
+  st=dim(otudf)[1]
+  a=otudf>0
+  
+  alpha=apply(a,1,sum)
+  SSobs=a%*%t(a)
+  Jobs=matrix(-1,st,st)
+  for (i in 1:st){
+    for (j in i:st) {
+      Jobs[i,j]=SSobs[i,j]/(alpha[i]+alpha[j]-SSobs[i,j])
+    }
+  }
+  colnames(Jobs)=row.names(otudf)
+  row.names(Jobs)=row.names(otudf)
+  Jobs = as.data.frame(Jobs)
+
+  return(Jobs)
+
+}
+
+Jex_rc=function(otudf,K=9,eq=F){
+  sp=dim(otudf)[2]
+  st=dim(otudf)[1]
+  a=otudf>0
+  
+  alpha=apply(a,1,sum)
+  
+  pool=sum(apply(a,2,sum)>0)
+  occ=apply(a,2,sum)
+  
+  J=matrix(0,K,st*st)
+  
+  if (eq==F) {
+    for (k in 1:K){
+      Ran=matrix(0,st,pool)
+      for (i in 1:st) Ran[i,sample(1:pool,as.numeric(alpha[i]),prob=occ[occ>0])]<-T
+      SSran=Ran%*%t(Ran)
+      Jran=matrix(-1,st,st)
+      for (i in 1:st){
+        for (j in i:st) Jran[i,j]=SSran[i,j]/(alpha[i]+alpha[j]-SSran[i,j])
+      }
+      J[k,]=as.vector(Jran)
+    }
+  }
+  
+  if (eq==T) {
+    for (k in 1:K){
+      Ran=matrix(0,st,pool)
+      for (i in 1:st) Ran[i,sample(1:pool,as.numeric(alpha[i]))]<-T
+      SSran=Ran%*%t(Ran)
+      Jran=matrix(-1,st,st)
+      for (i in 1:st){
+        for (j in i:st) Jran[i,j]=SSran[i,j]/(alpha[i]+alpha[j]-SSran[i,j])
+      }
+      J[k,]=as.vector(Jran)
+    }
+  }
+  
+  
+  if (eq==T) name="Mean_equal.csv" else name="Mean_unequal.csv"
+  Jex=matrix(apply(J,2,mean),st,st)
+  colnames(Jex)=row.names(otudf)
+  row.names(Jex)=row.names(otudf)
+  Jex = as.data.frame(Jex)
+  return(Jex)
+}

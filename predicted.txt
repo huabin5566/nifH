@@ -1,0 +1,89 @@
+###################predicted current#########################
+library(MuMIn)
+library(Rmisc) 
+library(RColorBrewer) 
+library(reshape2)
+library(dplyr)
+library(picante)
+library(dismo)
+library(raster)
+obss1 <- read.csv("40otu_alpha.csv", header = T)
+obss <- obss1[,c(5,7,8,28,29,30:48)]
+obss<-na.omit(obss)
+predictors <- paste0("bio", 12, sep="", collapse=" + ")
+formula <- as.formula(paste("Relative_abundance"," ~", predictors))
+m = lm (formula, data = obss)
+summary(m)
+n_data_pathcurrent <- dir('/node5/ps/h/hzh/predicted/current',full.names = TRUE)
+predictorscurrent <- stack(n_data_pathcurrent)
+original_names <- names(predictorscurrent)
+new_names <- paste0("bio", formatC(1:19, width = 2, flag = "0")) 
+predictorscurrent <- setNames(predictorscurrent, new_names)
+p = predict (predictorscurrent, m)
+p.xy = as.data.frame (p, xy = TRUE)
+p.xyz <- p.xy[!is.na(p.xy$layer), ]
+mean(p.xyz$layer)
+mean_value <- mean(p.xyz$layer, na.rm = TRUE)
+p_df <- as.data.frame(p, xy = TRUE)
+p.xyz <- p.xyz %>% filter(y > -60)
+
+ggplot() +
+geom_raster(data = p.xyz, aes(x = x, y = y, fill = layer)) +
+scale_fill_viridis_c() +
+coord_quickmap() +
+labs() +
+theme_minimal()
+write.csv(p.xyz,"Relative_abundance_current.csv")
+
+###################MESS##################
+obs1_unique <- distinct(obss, lats, lons, .keep_all = TRUE)
+reference_points_lonlat <- obs1_unique[,c(3,2)]
+reference_points <- extract(p, reference_points_lonlat)
+mess_result <- mess(p, reference_points, full=TRUE)
+plot(mess_result)
+writeRaster(mess_result,"MESS_Relative_abundance_current.asc", format="ascii")
+raster_data <- raster("MESS_Relative_abundance_current.asc")
+plot(raster_data)
+
+##########################predicted future########################
+
+year_df = c("year40", "year60", "year80", "year100") 
+SSPs_df = c("ssp126", "ssp245", "ssp370", "ssp585")
+for(a in year_df){
+  year = a 
+  for(b in SSPs_df){
+    SSPs = b
+    dfname <- paste0("/node5/ps/h/hzh/predicted/",year,"/",SSPs)
+    prdfname <- dir(dfname,full.names = TRUE)
+    prdf <- stack(prdfname)
+    
+    p.zuobiao =  c()
+    for(i in prdfname){
+      prdf <- stack(i)
+      original_names <- names(prdf)
+      new_names <- paste0("bio", formatC(1:19, width = 2, flag = "0")) 
+      predictorsfuture <- setNames(prdf, new_names)
+      p = predict (predictorsfuture, m)
+      p.xy = as.data.frame (p, xy = TRUE)
+      p.xyz <- p.xy[!is.na(p.xy$layer), ]
+      mean(p.xyz$layer)
+      mean_value <- mean(p.xyz$layer, na.rm = TRUE)
+      p_df <- as.data.frame(p, xy = TRUE)
+      p.xyz <- p.xyz %>% filter(y > -60)
+      p.xyz$name = i
+      p.zuobiao = rbind(p.zuobiao,p.xyz)
+    }
+    p_zuobiao = p.zuobiao %>%
+      group_by(x,y,name) %>%
+      summarise(
+        layer = mean(layer, na.rm = TRUE))
+
+    ggplot() +
+    geom_raster(data = p_zuobiao, aes(x = x, y = y, fill = layer)) +
+   scale_fill_viridis_c() +
+    coord_quickmap() +
+    labs() +
+   theme_minimal()
+    write.csv(p_zuobiao,paste0("Relative_abundance_future_",year,"_",SSPs,".csv"))
+  }
+}

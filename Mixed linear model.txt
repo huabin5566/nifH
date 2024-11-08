@@ -1,0 +1,343 @@
+############################Mixed linear model##########################################
+library(lme4)
+library(lmerTest)
+library(sjPlot) 
+library(nlme)
+library(RLRsim)
+library(glmmTMB)
+library(tidybayes)
+library(performance) 
+library(vegan)
+library(agricolae) 
+library(Rmisc) 
+library(ggplot2) 
+library(RColorBrewer) 
+library(reshape2)
+library(dplyr)
+library(picante)
+library(glmm.hp)
+library(ggplot2)
+library(glmm.hp)
+library(ggplot2)
+library(data.table)
+library(scales)
+
+envc<-read.csv(file = "nifH_env.csv",header = T,row.names = 1)
+env1<-envc[,10:16]
+head(env1)
+env.scale<-scale(env1)
+colnames(env1) <- paste0("raw_", colnames(env1))
+envsc<-cbind(envc[,c(1:9,17:19)],env.scale,env1)
+envsc<-na.omit(envsc)
+head(envsc)
+
+gm1<-lmer(pcoa1 ~ MAP + MAT + NDVI + pH  + T_OC+ TN +T_SILT +(1|site),
+          data=envsc)
+summary(gm1)
+tab_model(gm1)
+
+gm2<-lmer(Richness ~  MAP + MAT + NDVI + pH  + T_OC+ TN +T_SILT +(1|site),
+           data=envsc)
+summary(gm2)
+tab_model(gm2)
+
+gm3<-lmer(logabundance ~  MAP + MAT + NDVI + pH  + T_OC+ TN +T_SILT +(1|site),
+          data=envsc)
+summary(gm3)
+tab_model(gm3)
+options(warn=-1)
+hp1 <- glmm.hp(gm1)
+hp2 <- glmm.hp(gm2)
+hp3 <- glmm.hp(gm3)
+
+source("individual_plot.R")
+pdf("plots_output8.pdf", width = 80/25.4, height = 50/25.4)
+individual_plot( gm1, yfactor = "pcoa1",xfactor = "MAP", rawxfactor = "raw_MAP",hp1)
+individual_plot( gm2, yfactor = "Richness",xfactor = "MAP", rawxfactor = "raw_MAP",hp2)
+individual_plot( gm3, yfactor = "logabundance",xfactor = "MAP", rawxfactor = "raw_MAP",hp3)
+dev.off()
+
+#########################individual_plot.R#################################################################################
+individual_plot <- function(model1,yfactor,xfactor,rawxfactor,hp) {
+  
+  if (!exists("rawxfactor")) rawxfactor <- xfactor
+  cont_single_gg<-function(data,parm,coeff,boot,
+                           center=FALSE,logged=FALSE,scaled=FALSE,
+                           nreps=1000){
+    if(center==FALSE&
+       logged==TRUE&
+       scaled==FALSE){SA=seq(min(data[,get(parm)]),max(data[,get(parm)]),length=nreps)
+       SA=log(SA)}
+    if(center==TRUE&
+       logged==TRUE&
+       scaled==FALSE){SA=seq(min(data[,get(parm)]),max(data[,get(parm)]),length=nreps)
+       SA=log(SA)
+       SA<-(SA-mean(data[,log(get(parm))]))
+    }
+    
+    if(center==FALSE&
+       logged==FALSE&
+       scaled==FALSE){SA=seq(min(data[,get(parm)]),max(data[,get(parm)]),length=nreps)}
+    if(center==TRUE&
+       logged==FALSE&
+       scaled==FALSE){SA=seq(min(data[,get(parm)]),max(data[,get(parm)]),length=nreps)
+       SA<-(SA-mean(data[,get(parm)]))
+    }
+    
+    if(center==FALSE&
+       logged==TRUE&
+       scaled==TRUE){SA=seq(min(data[,get(parm)]),max(data[,get(parm)]),length=nreps)
+       SA=log(SA)
+       SA<-(SA-mean(data[,log(get(parm))]))/sd(data[,log(get(parm))])
+    }
+    if(center==TRUE&
+       logged==TRUE&
+       scaled==TRUE){SA=seq(min(data[,get(parm)]),max(data[,get(parm)]),length=nreps)
+       SA=log(SA)
+       SA<-(SA-mean(data[,log(get(parm))]))/sd(data[,log(get(parm))])
+    }
+    
+    if(center==FALSE&
+       logged==FALSE&
+       scaled==TRUE){SA=seq(min(data[,get(parm)]),max(data[,get(parm)]),length=nreps)
+       SA<-(SA-mean(data[,get(parm)]))/sd(data[,get(parm)])
+    }
+    if(center==TRUE&
+       logged==FALSE&
+       scaled==TRUE){SA=seq(min(data[,get(parm)]),max(data[,get(parm)]),length=nreps)
+       SA<-(SA-mean(data[,get(parm)]))/sd(data[,get(parm)])
+    }
+    
+    
+    if(logged==TRUE&
+       center==TRUE&
+       scaled==FALSE){return(data.table(mean=sapply(SA,function(x){
+         mean(boot$t[,"(Intercept)"]+(boot$t[,coeff]*x))}),
+         up=sapply(SA,function(x){
+           quantile((boot$t[,"(Intercept)"])+
+                      (boot$t[,coeff]*x) ,prob=0.975)}),
+         low=sapply(SA,function(x){
+           quantile((boot$t[,"(Intercept)"])+
+                      (boot$t[,coeff]*x) ,prob=0.025)}),
+         xaxis=exp(SA+mean(data[,log(get(parm))])),
+         parm=parm))
+    }
+    
+    if(logged==TRUE&
+       scaled==TRUE){return(data.table(mean=sapply(SA,function(x){
+         mean(boot$t[,"(Intercept)"]+(boot$t[,coeff]*x))}),
+         up=sapply(SA,function(x){
+           quantile((boot$t[,"(Intercept)"])+
+                      (boot$t[,coeff]*x) ,prob=0.975)}),
+         low=sapply(SA,function(x){
+           quantile((boot$t[,"(Intercept)"])+
+                      (boot$t[,coeff]*x) ,prob=0.025)}),
+         xaxis=exp((SA*sd(data[,log(get(parm))]))+mean(data[,log(get(parm))])),
+         parm=parm))
+    }
+    if(logged==TRUE&
+       scaled==FALSE&
+       center==FALSE){return(data.table(mean=sapply(SA,function(x){
+         mean(boot$t[,"(Intercept)"]+(boot$t[,coeff]*x))}),
+         up=sapply(SA,function(x){
+           quantile((boot$t[,"(Intercept)"])+
+                      (boot$t[,coeff]*x) ,prob=0.975)}),
+         low=sapply(SA,function(x){
+           quantile((boot$t[,"(Intercept)"])+
+                      (boot$t[,coeff]*x) ,prob=0.025)}),
+         xaxis=exp(SA),
+         parm=parm))
+    }
+    if(logged==FALSE&
+       center==TRUE&
+       scaled==FALSE){return(data.table(mean=sapply(SA,function(x){
+         mean(boot$t[,"(Intercept)"]+(boot$t[,coeff]*x))}),
+         up=sapply(SA,function(x){
+           quantile((boot$t[,"(Intercept)"])+
+                      (boot$t[,coeff]*x) ,prob=0.975)}),
+         low=sapply(SA,function(x){
+           quantile((boot$t[,"(Intercept)"])+
+                      (boot$t[,coeff]*x) ,prob=0.025)}),
+         xaxis=SA+mean(data[,log(get(parm))]),
+         parm=parm))
+    }
+    
+    if(logged==FALSE&
+       scaled==TRUE){return(data.table(mean=sapply(SA,function(x){
+         mean(boot$t[,"(Intercept)"]+(boot$t[,coeff]*x))}),
+         up=sapply(SA,function(x){
+           quantile((boot$t[,"(Intercept)"])+
+                      (boot$t[,coeff]*x) ,prob=0.975)}),
+         low=sapply(SA,function(x){
+           quantile((boot$t[,"(Intercept)"])+
+                      (boot$t[,coeff]*x) ,prob=0.025)}),
+         xaxis=(SA*sd(data[,get(parm)]))+mean(data[,get(parm)]),
+         parm=parm))
+    }
+    if(logged==FALSE&
+       scaled==FALSE&
+       center==FALSE){return(data.table(mean=sapply(SA,function(x){
+         mean(boot$t[,"(Intercept)"]+(boot$t[,coeff]*x))}),
+         up=sapply(SA,function(x){
+           quantile((boot$t[,"(Intercept)"])+
+                      (boot$t[,coeff]*x) ,prob=0.975)}),
+         low=sapply(SA,function(x){
+           quantile((boot$t[,"(Intercept)"])+
+                      (boot$t[,coeff]*x) ,prob=0.025)}),
+         xaxis=SA,
+         parm=parm))
+    }
+    
+  }
+
+  cont_single_pts<-function(data,parm,coeff,mod){
+    return_x<-data[,get(parm)]
+    bg<-resid(mod)+
+      fixef(mod)["(Intercept)"]+
+      (fixef(mod)[coeff]*data[,get(coeff)])
+    return(data.frame(xaxis=return_x,
+                      bg=bg,
+                      parm=parm))
+    
+  } 
+  
+  options(scipen = 999, digits = 10)
+  
+  if (class(model1) == "glmerMod") {
+    
+    res<-as.data.frame(hp$lognormal)
+    res<-mutate(res,X=rownames(res))
+    
+    mytheme <- theme_bw(base_family = "Arial") +
+      theme(
+        panel.grid = element_blank(),
+        panel.border = element_rect(fill = NA, colour = 'black', size = 0.3),
+        panel.background = element_rect(fill = '#FFFFFF'),
+        plot.title = element_text(size = 7, hjust = 0.5),
+        plot.subtitle = element_text(size = 7, hjust = 0.5),
+        axis.text = element_text(size = 7, color = 'black'),
+        axis.title = element_text(size = 7, color = 'black'),
+        legend.position = "none",
+        axis.ticks = element_line(size = 0.3)
+      )
+    
+  
+    p1 <- ggplot(res, aes(x = reorder(X, Individual), y = Individual)) +
+      geom_bar(position = position_dodge(0.6), stat = "identity", width = 0.6, size = 0.3) +
+      labs(x = "", y = "Individual effects", title = " ") +
+      scale_y_continuous(limits = c(0, NA),  
+                         expand = expansion(mult = c(0, 0.05))  
+      ) +
+      mytheme
+    plot(p1)
+   
+    r2 = res[xfactor,"Individual"]
+    sm <- summary(model1)
+    coeff<-sm$coefficients
+    if (coeff[xfactor,4] < 0.0001 ) {
+      eqn2 <- as.character(as.expression(
+        substitute("slope" == slope * "," ~~ italic (r)^2 ~ "=" ~r2 * "," ~~italic(p)~" < 0.0001" ,
+                   list(slope=round(coeff[xfactor,1],4),
+                        r2=round(r2,4)))))
+    } else {
+      eqn2 <- as.character(as.expression(
+        substitute("slope" == slope * "," ~~ italic (r)^2 ~ "=" ~r2 * "," ~~italic(p)~"=" ~ pr,
+                   list(slope=round(coeff[xfactor,1],4),
+                        r2=round(r2,4),
+                        pr=round(coeff[xfactor,4],4)))))
+    }
+    
+    mod_list = list(model1)
+    boot_list<-llply(mod_list,.fun = function(x)bootMer(x,fixef,10), .progress="win")
+    
+    
+    envscc <-as.data.table(envsc)
+    
+    frame_logh<-cont_single_gg(data=envscc, parm= rawxfactor,coeff = xfactor,
+                               boot=boot_list[[1]],scale=T)
+    
+    bg_logh<-cont_single_pts(data=envscc, parm= rawxfactor,coeff = xfactor,
+                             mod=mod_list[[1]])
+    
+    p2 <- ggplot() +
+      geom_point(data = bg_logh, aes(x = xaxis, y = bg), col = 'black', size = 0.3) +
+      geom_line(data = frame_logh, aes(x = xaxis, y = mean), col = "red",size = 0.5) +  # Changed to red
+      annotate('text', label = eqn2,
+               x = -Inf, y = Inf, hjust = 0, vjust = 1, size = 7, parse = TRUE) +  # Font size updated
+      xlab(paste(xfactor)) +
+      ylab(paste(yfactor)) +
+     
+      mytheme
+    plot(p2)
+    
+    
+    
+  } else if (class(model1)[1] == "lmerModLmerTest") {
+    res<-as.data.frame(hp$hierarchical.partitioning)
+    res<-mutate(res,X=rownames(res))
+    
+    mytheme <- theme_bw(base_family = "Arial") +
+      theme(
+        panel.grid = element_blank(),
+        panel.border = element_rect(fill = NA, colour = 'black', size = 0.3),
+        panel.background = element_rect(fill = '#FFFFFF'),
+        plot.title = element_text(size = 7, hjust = 0.5),
+        plot.subtitle = element_text(size = 7, hjust = 0.5),
+        axis.text = element_text(size = 7, color = 'black'),
+        axis.title = element_text(size = 7, color = 'black'),
+        legend.position = "none",
+        axis.ticks = element_line(size = 0.3)
+      )
+    
+   
+    p1 <- ggplot(res, aes(x = reorder(X, Individual), y = Individual)) +
+      geom_bar(position = position_dodge(0.6), stat = "identity", width = 0.6, size = 0.3) +
+      labs(x = "", y = "Individual effects", title = " ") +
+      scale_y_continuous(limits = c(0, NA),  
+                         expand = expansion(mult = c(0, 0.05))     
+      ) +
+      mytheme
+    plot(p1)
+  
+    r2 = res[xfactor,"Individual"]
+    sm <- summary(model1)
+    coeff<-sm$coefficients 
+    if (coeff[xfactor,5] < 0.0001 ) {
+      eqn2 <- as.character(as.expression(
+        substitute("slope" == slope * "," ~~ italic (r)^2 ~ "=" ~r2 * "," ~~italic(p)~" < 0.0001" ,
+                   list(slope=round(coeff[xfactor,1],4),
+                        r2=round(r2,4)))))
+    } else {
+      eqn2 <- as.character(as.expression(
+        substitute("slope" == slope * "," ~~ italic (r)^2 ~ "=" ~r2 * "," ~~italic(p)~"=" ~ pr,
+                   list(slope=round(coeff[xfactor,1],4),
+                        r2=round(r2,4),
+                        pr=round(coeff[xfactor,5],4)))))
+    }
+    mod_list = list(model1)
+    boot_list<-llply(mod_list,.fun = function(x)bootMer(x,fixef,10), .progress="win")
+    
+    
+    envscc <-as.data.table(envsc)
+    
+    frame_logh<-cont_single_gg(data=envscc, parm= rawxfactor,coeff = xfactor,
+                               boot=boot_list[[1]],scale=T)
+    
+    bg_logh<-cont_single_pts(data=envscc, parm= rawxfactor,coeff = xfactor,
+                             mod=mod_list[[1]])
+    
+    p2 <- ggplot() +
+      geom_point(data = bg_logh, aes(x = xaxis, y = bg), col = 'black', size = 0.3) +
+      geom_line(data = frame_logh, aes(x = xaxis, y = mean), col = "red",size = 0.5) +  # Changed to red
+      annotate('text', label = eqn2,
+               x = -Inf, y = Inf, hjust = 0, vjust = 1, size = 7, parse = TRUE) +  # Font size updated
+      xlab(paste(xfactor)) +
+      ylab(paste(yfactor)) +
+      
+      mytheme
+    plot(p2)
+    
+  } else {
+    stop("Error: This is neither a lmer nor a glmer model")
+  }
+}

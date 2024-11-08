@@ -1,0 +1,80 @@
+library(vegan)
+library(picante)
+library(dplyr)
+library(geosphere)
+library(glmm.hp)
+otu <- read.csv(file ="nifH_otu_rare_40.csv" ,
+                header = T,row.names = 1)
+envdata<-read.csv(file ="40otu_env.csv" ,
+                  header = T,row.names = 1)
+env<-envdata[,1:23]
+env<-na.omit(env)
+otu <-otu[rownames(otu) %in% rownames(env) , colSums(otu)!=0]
+env<-env[match(rownames(otu), rownames(env)), ]
+comm_dis <- vegdist(otu, method = 'bray')
+comm_sim <- log(2 - comm_dis, exp(1))
+Site_dis <- distm(env[c("lons", "lats")]) / 1000 
+space <- log(Site_dis+1, exp(1))
+rownames(space) <- rownames(env)
+colnames(space) <- rownames(env)
+space <- as.dist(space)
+MAP_dis <- vegdist(env$MAP, method = "euclidean") %>% as.matrix()
+rownames(MAP_dis) <- rownames(env)
+colnames(MAP_dis) <- rownames(env)
+MAP_dis <- as.dist(MAP_dis)
+
+MAT_dis <- vegdist(env$MAT, method = "euclidean") %>% as.matrix()
+rownames(MAT_dis) <- rownames(env)
+colnames(MAT_dis) <- rownames(env)
+MAT_dis <- as.dist(MAT_dis)
+
+NDVI_dis <- vegdist(env$NDVI, method = "euclidean") %>% as.matrix()
+rownames(NDVI_dis) <- rownames(env)
+colnames(NDVI_dis) <- rownames(env)
+NDVI_dis <- as.dist(NDVI_dis)
+
+pH_dis <- vegdist(env$pH, method = "euclidean") %>% as.matrix()
+rownames(pH_dis) <- rownames(env)
+colnames(pH_dis) <- rownames(env)
+pH_dis <- as.dist(pH_dis)
+
+
+TOC_dis <- vegdist(env$T_OC, method = "euclidean") %>% as.matrix()
+rownames(TOC_dis) <- rownames(env)
+colnames(TOC_dis) <- rownames(env)
+TOC_dis <- as.dist(TOC_dis)
+
+TN_dis <- vegdist(env$TN, method = "euclidean") %>% as.matrix()
+rownames(TN_dis) <- rownames(env)
+colnames(TN_dis) <- rownames(env)
+TN_dis <- as.dist(TN_dis)
+
+Silt_dis <- vegdist(env$T_SILT, method = "euclidean") %>% as.matrix()
+rownames(Silt_dis) <- rownames(env)
+colnames(Silt_dis) <- rownames(env)
+Silt_dis <- as.dist(Silt_dis)
+library(MuMIn)
+space<-stdize(space)
+#PET_dis<-stdize(PET_dis)
+MAP_dis<-stdize(MAP_dis)
+MAT_dis<-stdize(MAT_dis)
+NDVI_dis<-stdize(NDVI_dis)
+pH_dis<-stdize(pH_dis)
+TOC_dis<-stdize(TOC_dis)
+TN_dis<-stdize(TN_dis)
+Silt_dis<-stdize(Silt_dis)
+envlist = list(comm_dis,space,NDVI_dis,pH_dis,TOC_dis,TN_dis,MAT_dis,MAP_dis,Silt_dis)
+envlist <- do.call(cbind,envlist)
+envlist <- data.frame(envlist)
+colnames(envlist) = c("comm_dis","space","NDVI_dis","pH_dis","TOC_dis","TN_dis","MAT_dis","MAP_dis","Silt_dis")
+gm1 = lm(comm_dis ~ space+NDVI_dis+ MAT_dis+ MAP_dis+pH_dis+TOC_dis+TN_dis+Silt_dis,data = envlist)
+hp<-glmm.hp(gm1)
+hp
+pdf("individual effect.pdf")
+plot(hp)
+dev.off()
+r2part <- varpart(envlist[,1],envlist[,2],envlist[,3],envlist[,c(4:7,9)],envlist[,c(8)])
+r2part
+pdf("VPA.pdf")
+plot(r2part, Xnames = c('Spatial', 'Plant',"Env", "MAP"),cutoff = -Inf, cex = 0.8, bg=2:5)
+dev.off()

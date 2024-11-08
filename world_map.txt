@@ -1,0 +1,169 @@
+library(ggmap)
+library(maps)
+ext_data <- read.csv( "nifH_env.csv", row.names = 1, check.names = F)
+d0 <- ext_data
+
+d0$Biome <- factor(d0$Biome, levels = c("Alpine cropland",
+                                        "Continental cropland",
+                                        "Dry cropland",
+                                        "Temperate cropland",
+                                        "Tropical cropland",
+                                        "Alpine forest",
+                                        "Continental forest",
+                                        "Dry forest",
+                                        "Temperate forest",
+                                        "Tropical forest",
+                                        "Alpine grassland",
+                                        "Continental grassland",
+                                        "Dry grassland",
+                                        "Temperate grassland",
+                                        "Tropical grassland",
+                                        "Polar grassland",
+                                        "Continental shrubland",
+                                        "Dry shrubland",
+                                        "Temperate shrubland",
+                                        "Alpine desert",
+                                        "Continental desert",
+                                        "Dry desert",
+                                        "Temperate desert"
+))
+library(RColorBrewer)
+colors <- brewer.pal(11, "Spectral") colors <- colorRampPalette(colors)(23) 
+cropland_colors <- brewer.pal(5, "Blues")   
+forest_colors <- brewer.pal(5, "Reds")   
+grassland_colors <- brewer.pal(6, "Greens")
+shrubland_colors <- brewer.pal(3, "Purples")
+desert_colors <- brewer.pal(4, "Oranges")     
+color_mapping <- c(
+  "Alpine cropland" = cropland_colors[5],
+  "Continental cropland" = cropland_colors[5],
+  "Dry cropland" = cropland_colors[5],
+  "Temperate cropland" = cropland_colors[5],
+  "Tropical cropland" = cropland_colors[5],
+  "Alpine forest" = forest_colors[5],
+  "Continental forest" = forest_colors[5],
+  "Dry forest" = forest_colors[5],
+  "Temperate forest" = forest_colors[5],
+  "Tropical forest" = forest_colors[5],
+  "Alpine grassland" = grassland_colors[5],
+  "Continental grassland" = grassland_colors[5],
+  "Dry grassland" = grassland_colors[5],
+  "Temperate grassland" = grassland_colors[5],
+  "Tropical grassland" = grassland_colors[5],
+  "Polar grassland" = grassland_colors[5],
+  "Continental shrubland" = shrubland_colors[3],
+  "Dry shrubland" = shrubland_colors[3],
+  "Temperate shrubland" = shrubland_colors[3],
+  "Alpine desert" = desert_colors[4],
+  "Continental desert" = desert_colors[4],
+  "Dry desert" = desert_colors[4],
+  "Temperate desert" = desert_colors[4]
+)
+shapes <- c("Alpine cropland" = 0,
+            "Continental cropland" = 1,
+            "Dry cropland" = 2,
+            "Temperate cropland" = 5,
+            "Tropical cropland" = 6,
+            "Alpine forest" = 0,
+            "Continental forest" = 1,
+            "Dry forest" = 2,
+            "Temperate forest" = 5,
+            "Tropical forest" = 6,
+            "Alpine grassland" = 0,
+            "Continental grassland" = 1,
+            "Dry grassland" = 2,
+            "Temperate grassland" = 5,
+            "Tropical grassland" = 6,
+            "Polar grassland"= 7,
+            "Continental shrubland" = 1,
+            "Dry shrubland" = 2,
+            "Temperate shrubland" = 5,
+            "Alpine desert"= 0,
+            "Continental desert" = 1,
+            "Dry desert" = 2,
+            "Temperate desert" = 5
+)
+mapWorld <- borders("world", colour="gray70", size = 0.08,fill="white") # create a layer of borders
+mp <- ggplot() + mapWorld + 
+  xlab("Longitude (°)") + ylab("Latitude (°)") +
+  theme(
+    axis.text = element_text(size = 7, face = "bold", color = "black"),
+    axis.title = element_text(size = 7, face = "bold"),
+    axis.ticks = element_line(size = 0.2, color = "black"), 
+    panel.border = element_rect(fill = NA, colour = 'black', size = 0.2), 
+    panel.background = element_rect(fill = "gray70"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    legend.text = element_text(size = 7),
+    legend.title = element_text(size = 7, face = "bold"),
+    legend.position = "bottom",
+    legend.background = element_blank(),
+    legend.key = element_blank(),
+    legend.direction = "horizontal" 
+  ) +
+  scale_x_continuous(breaks = c(-150,-100, -50, 0, 50, 100, 150)) +
+  scale_y_continuous(breaks = c(-90, -45, 0, 45, 90)) +
+  geom_jitter(data = d0, aes(x = lons, y = lats, color = Biome, shape = Biome), 
+              size = 0.7, stroke = 0.3, width = 0.05, height = 0.05) +
+  scale_color_manual(
+    values = color_mapping,
+    labels = c(
+      "Alpine cropland" = "Alpine cropland (3, 5)",
+      "Continental cropland" = "Continental cropland (15, 66)",
+      "Dry cropland" = "Dry cropland (16, 53)",
+      "Temperate cropland" = "Temperate cropland (33, 140)",
+      "Tropical cropland" = "Tropical cropland (14, 69)",
+      "Alpine forest" = "Alpine forest (3, 17)",
+      "Continental forest" = "Continental forest (24, 37)",
+      "Dry forest" = "Dry forest (1, 1)",
+      "Temperate forest" = "Temperate forest (22, 62)",
+      "Tropical forest" = "Tropical forest (49, 279)",
+      "Alpine grassland" = "Alpine grassland (9, 32)",
+      "Continental grassland" = "Continental grassland (16, 50)",
+      "Dry grassland" = "Dry grassland (18, 66)",
+      "Temperate grassland" = "Temperate grassland (16, 81)",
+      "Tropical grassland" = "Tropical grassland (2, 2)",
+      "Polar grassland" = "Polar grassland (3, 34)",
+      "Continental shrubland" = "Continental shrubland (4, 4)",
+      "Dry shrubland" = "Dry shrubland (6, 28)",
+      "Temperate shrubland" = "Temperate shrubland (6, 18)",
+      "Alpine desert" = "Alpine desert (8, 21)",
+      "Continental desert" = "Continental desert (7, 15)",
+      "Dry desert" = "Dry desert (9, 47)",
+      "Temperate desert" = "Temperate desert (4, 10)"
+    ) ) + 
+  scale_shape_manual(
+    values = shapes,
+    labels = c(
+      "Alpine cropland" = "Alpine cropland (3, 5)",
+      "Continental cropland" = "Continental cropland (15, 66)",
+      "Dry cropland" = "Dry cropland (16, 53)",
+      "Temperate cropland" = "Temperate cropland (33, 140)",
+      "Tropical cropland" = "Tropical cropland (14, 69)",
+      "Alpine forest" = "Alpine forest (3, 17)",
+      "Continental forest" = "Continental forest (24, 37)",
+      "Dry forest" = "Dry forest (1, 1)",
+      "Temperate forest" = "Temperate forest (22, 62)",
+      "Tropical forest" = "Tropical forest (49, 279)",
+      "Alpine grassland" = "Alpine grassland (9, 32)",
+      "Continental grassland" = "Continental grassland (16, 50)",
+      "Dry grassland" = "Dry grassland (18, 66)",
+      "Temperate grassland" = "Temperate grassland (16, 81)",
+      "Tropical grassland" = "Tropical grassland (2, 2)",
+      "Polar grassland" = "Polar grassland (3, 34)",
+      "Continental shrubland" = "Continental shrubland (4, 4)",
+      "Dry shrubland" = "Dry shrubland (6, 28)",
+      "Temperate shrubland" = "Temperate shrubland (6, 18)",
+      "Alpine desert" = "Alpine desert (8, 21)",
+      "Continental desert" = "Continental desert (7, 15)",
+      "Dry desert" = "Dry desert (9, 47)",
+      "Temperate desert" = "Temperate desert (4, 10)"
+    )) + 
+  guides(
+    color = guide_legend(override.aes = list(size = 1), nrow = 6), 
+    shape = guide_legend(override.aes = list(size = 1), nrow = 6)  
+  ) + 
+  labs(color = "Biome", shape = "Biome")+
+  coord_fixed(ratio = 1)  
+print(mp)
+ggsave("world_map.pdf", plot = mp, width = 180, height = 150, units = "mm")

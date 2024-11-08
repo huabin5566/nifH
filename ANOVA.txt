@@ -1,0 +1,212 @@
+ ANOVA Relative_abundance
+library(dplyr)
+library(ggplot2)
+ext_data <- read.csv( "nifH_env.csv", row.names = 1, check.names = F)
+ext_df = ext_data %>%
+  group_by(Biome,site) %>%
+  dplyr::summarise(
+    Relative_abundance_df = mean(Relative_abundance, na.rm = TRUE),
+    Relative_abundance_num = sum(!is.na(Relative_abundance))
+  )
+se <- function(x, na.rm = FALSE) {
+  sd(x, na.rm = na.rm) / sqrt(sum(!is.na(x)))
+}
+daaa = ext_df %>%
+  group_by(Biome) %>%
+  dplyr::summarise(
+    Relative_abundance_mean = mean(Relative_abundance_df, na.rm = TRUE),
+    Relative_abundance_SE = se(Relative_abundance_df, na.rm = TRUE),
+    Relative_abundance_num = sum(!is.na(Relative_abundance_df))
+  )
+library(RColorBrewer)
+
+
+colors <- brewer.pal(11, "Spectral") 
+colors <- colorRampPalette(colors)(23) 
+
+cropland_colors <- brewer.pal(5, "Blues")   
+forest_colors <- brewer.pal(5, "Reds")   
+grassland_colors <- brewer.pal(6, "Greens")
+shrubland_colors <- brewer.pal(3, "Purples")
+desert_colors <- brewer.pal(4, "Oranges")     
+colors <- c(
+  "Alpine cropland" = cropland_colors[5],
+  "Continental cropland" = cropland_colors[4],
+  "Dry cropland" = cropland_colors[3],
+  "Temperate cropland" = cropland_colors[2],
+  "Tropical cropland" = cropland_colors[1],
+  
+  "Alpine forest" = forest_colors[5],
+  "Continental forest" = forest_colors[4],
+  "Dry forest" = forest_colors[3],
+  "Temperate forest" = forest_colors[2],
+  "Tropical forest" = forest_colors[1],
+  
+  "Alpine grassland"= grassland_colors[6],
+  "Continental grassland" = grassland_colors[5],
+  "Dry grassland" = grassland_colors[4],
+  "Temperate grassland" = grassland_colors[3],
+  "Tropical grassland" = grassland_colors[2],
+  "Polar grassland" = grassland_colors[1],
+  
+  "Continental shrubland" = shrubland_colors[3],
+  "Dry shrubland" = shrubland_colors[2],
+  "Temperate shrubland" = shrubland_colors[1],
+  
+  "Alpine desert" = desert_colors[4],
+  "Continental desert" = desert_colors[3],
+  "Dry desert" = desert_colors[2],
+  "Temperate desert" = desert_colors[1]
+)
+daaa$Biome <- factor(daaa$Biome, levels = names(colors))
+anova_result <- aov(Relative_abundance_df ~ Biome, data = ext_df)
+summary(anova_result)
+daaa$correction_ecosystem=str_split(daaa$Biome," ",simplify = T)[,2]
+
+P <- ggplot(data=daaa, aes(x=Biome, y=Relative_abundance_mean, fill=Biome)) +
+  scale_fill_manual(values = colors) +
+  geom_bar(position=position_dodge(width = 0.8), stat="identity", colour="black", width = 0.6, size = 0.2) +
+  geom_errorbar(aes(ymin=Relative_abundance_mean-Relative_abundance_SE, ymax=Relative_abundance_mean+Relative_abundance_SE),
+                width=0.2, position=position_dodge(0.8), size = 0.2) +
+  scale_y_continuous(
+    limits = c(0, 0.000047),  
+    expand = c(0, 0),  
+    labels = function(x) {
+      formatted_labels <- sapply(x, function(value) {
+        if (is.na(value)) {
+          return(NA)  
+        } else if (value == 0) {
+          return("0.00")
+        } else if (value == 1e-05) {
+          return("0.01")
+        } else if (value == 2e-05) {
+          return("0.02")
+        } else if (value == 3e-05) {
+          return("0.03")
+        } else if (value == 4e-05) {
+          return("0.04")
+        } else {
+          return(sprintf("%.2f", value))  
+        }
+      })
+      return(formatted_labels)
+    }
+  ) +  
+  theme(
+    panel.grid = element_blank(), 
+    panel.border = element_rect(fill = NA, colour = 'black', size = 0.2),  
+    panel.background = element_rect(fill = '#FFFFFF'),
+    plot.title = element_text(size = 9, hjust = 0.5), 
+    plot.subtitle = element_text(size = 9, hjust = 0.5), 
+    axis.text = element_text(size = 9, color = 'black'), 
+    axis.title = element_text(size = 9, color = 'black'),
+    axis.text.x = element_text(angle = 90, hjust = 1),
+    axis.ticks = element_line(size = 0.2, color = "black"),  
+    legend.position = "none"
+  ) +
+  labs(x = NULL, y = "Relative abundance (‰)")
+P
+###########################################################################################ANOVA Richness
+ext_df = ext_data %>%
+  group_by(Biome,site) %>%
+  dplyr::summarise(
+    Richness_df = mean(Richness, na.rm = TRUE),
+    Richness_num = sum(!is.na(Richness))
+  )
+
+se <- function(x, na.rm = FALSE) {
+  sd(x, na.rm = na.rm) / sqrt(sum(!is.na(x)))
+}
+
+daaa = ext_df %>%
+  group_by(Biome) %>%
+  dplyr::summarise(
+    Richness_mean = mean(Richness_df, na.rm = TRUE),
+    Richness_SE = se(Richness_df, na.rm = TRUE),
+    Richness_num = sum(!is.na(Richness_df))
+  )
+library(RColorBrewer)
+colors <- brewer.pal(11, "Spectral") 
+colors <- colorRampPalette(colors)(23) 
+cropland_colors <- brewer.pal(5, "Blues")   
+forest_colors <- brewer.pal(5, "Reds")   
+grassland_colors <- brewer.pal(6, "Greens")
+shrubland_colors <- brewer.pal(3, "Purples")
+desert_colors <- brewer.pal(4, "Oranges")     
+colors <- c(
+  "Alpine cropland" = cropland_colors[5],
+  "Continental cropland" = cropland_colors[4],
+  "Dry cropland" = cropland_colors[3],
+  "Temperate cropland" = cropland_colors[2],
+  "Tropical cropland" = cropland_colors[1],
+  
+  "Alpine forest" = forest_colors[5],
+  "Continental forest" = forest_colors[4],
+  "Dry forest" = forest_colors[3],
+  "Temperate forest" = forest_colors[2],
+  "Tropical forest" = forest_colors[1],
+  
+  "Alpine grassland"= grassland_colors[6],
+  "Continental grassland" = grassland_colors[5],
+  "Dry grassland" = grassland_colors[4],
+  "Temperate grassland" = grassland_colors[3],
+  "Tropical grassland" = grassland_colors[2],
+  "Polar grassland" = grassland_colors[1],
+  
+  "Continental shrubland" = shrubland_colors[3],
+  "Dry shrubland" = shrubland_colors[2],
+  "Temperate shrubland" = shrubland_colors[1],
+  
+  "Alpine desert" = desert_colors[4],
+  "Continental desert" = desert_colors[3],
+  "Dry desert" = desert_colors[2],
+  "Temperate desert" = desert_colors[1]
+)
+daaa$Biome <- factor(daaa$Biome, levels = names(colors))
+anova_result <- aov(Richness_df ~ Biome, data = ext_df)
+summary(anova_result)
+daaa$correction_ecosystem=str_split(daaa$Biome," ",simplify = T)[,2]
+P <- ggplot(data=daaa, aes(x=Biome, y=Richness_mean, fill=Biome)) +
+scale_fill_manual(values = colors) +
+  geom_bar(position=position_dodge(width = 0.8), stat="identity", colour="black", width = 0.6, size = 0.2) +
+  geom_errorbar(aes(ymin=Richness_mean-Richness_SE, ymax=Richness_mean+Richness_SE),
+                width=0.2, position=position_dodge(0.8), size = 0.2) +
+  scale_y_continuous(
+    limits = c(0, 40),  
+    expand = c(0, 0),   
+    labels = function(x) {
+      formatted_labels <- sapply(x, function(value) {
+        if (is.na(value)) {
+          return(NA)  
+        } else if (value == 0) {
+          return("0.00")
+        } else if (value == 10) {
+          return("10.0")
+        } else if (value == 20) {
+          return("20.0")
+        } else if (value == 30) {
+          return("30.0")
+        } else if (value == 40) {
+          return("40.0")
+        } else {
+          return(sprintf("%.2f", value))  
+        }
+      })
+      return(formatted_labels)
+    }
+  ) +  
+  theme(
+    panel.grid = element_blank(), 
+    panel.border = element_rect(fill = NA, colour = 'black', size = 0.2),  
+    panel.background = element_rect(fill = '#FFFFFF'),
+    plot.title = element_text(size = 9, hjust = 0.5), 
+    plot.subtitle = element_text(size = 9, hjust = 0.5), 
+    axis.text = element_text(size = 9, color = 'black'), 
+    axis.title = element_text(size = 9, color = 'black'),
+    axis.text.x = element_text(angle = 90, hjust = 1),
+    axis.ticks = element_line(size = 0.2, color = "black"),  
+    legend.position = "none"
+  ) +
+  labs(x = NULL, y = "Richness")
+
+P

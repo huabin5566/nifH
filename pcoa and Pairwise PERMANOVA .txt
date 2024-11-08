@@ -1,0 +1,183 @@
+################################################################################################ pcoa###############
+library(vegan) 
+library(ape)  
+library(ggplot2)
+library(RColorBrewer) 
+library(plyr) 
+library(dplyr)
+library(RVAideMemoire)
+otu <- read.csv("nifH_otu_rare_40.csv",header=T,row.names = 1)
+dist <- vegdist(otu, method="bray", binary=FALSE, diag=1) 
+re <- pcoa(dist, correction="none", rn=NULL)
+a <- round(re$values$Relative_eig[1] * 100, 2)
+b <- round(re$values$Relative_eig[2] * 100, 2)
+df1 <- data.frame(x=re$vectors[,1],y=re$vectors[,2])
+env<-read.csv("nifH_env.csv",row.names=1,header=TRUE,check.names = F)
+env$Biome <- factor(env$Biome, levels = c("Alpine cropland",
+                                        "Continental cropland",
+                                        "Dry cropland",
+                                        "Temperate cropland",
+                                        "Tropical cropland",
+                                        
+                                        "Alpine forest",
+                                        "Continental forest",
+                                        "Dry forest",
+                                        "Temperate forest",
+                                        "Tropical forest",
+                                        
+                                        "Alpine grassland",
+                                        "Continental grassland",
+                                        "Dry grassland",
+                                        "Temperate grassland",
+                                        "Tropical grassland",
+                                        "Polar grassland",
+                                        
+                                        "Continental shrubland",
+                                        "Dry shrubland",
+                                        "Temperate shrubland",
+                                        
+                                        "Alpine desert",
+                                        "Continental desert",
+                                        "Dry desert",
+                                        "Temperate desert"                                                                            
+))
+library(RColorBrewer)
+colors <- brewer.pal(11, "Spectral") 
+colors <- colorRampPalette(colors)(23) 
+cropland_colors <- brewer.pal(5, "Blues")   
+forest_colors <- brewer.pal(5, "Reds")   
+grassland_colors <- brewer.pal(6, "Greens")
+shrubland_colors <- brewer.pal(3, "Purples")
+desert_colors <- brewer.pal(4, "Oranges")     
+colors <- c(
+  "Alpine cropland" = cropland_colors[5],
+  "Continental cropland" = cropland_colors[5],
+  "Dry cropland" = cropland_colors[5],
+  "Temperate cropland" = cropland_colors[5],
+  "Tropical cropland" = cropland_colors[5],
+  
+  "Alpine forest" = forest_colors[5],
+  "Continental forest" = forest_colors[5],
+  "Dry forest" = forest_colors[5],
+  "Temperate forest" = forest_colors[5],
+  "Tropical forest" = forest_colors[5],
+  
+  "Alpine grassland" = grassland_colors[5],
+  "Continental grassland" = grassland_colors[5],
+  "Dry grassland" = grassland_colors[5],
+  "Temperate grassland" = grassland_colors[5],
+  "Tropical grassland" = grassland_colors[5],
+  "Polar grassland" = grassland_colors[5],
+  
+  "Continental shrubland" = shrubland_colors[3],
+  "Dry shrubland" = shrubland_colors[3],
+  "Temperate shrubland" = shrubland_colors[33],
+  
+  "Alpine desert" = desert_colors[4],
+  "Continental desert" = desert_colors[4],
+  "Dry desert" = desert_colors[4],
+  "Temperate desert" = desert_colors[4]
+)
+shapes <- c("Alpine cropland" = 0,
+            "Continental cropland" = 1,
+            "Dry cropland" = 2,
+            "Temperate cropland" = 5,
+            "Tropical cropland" = 6,
+            
+            "Alpine forest" = 0,
+            "Continental forest" = 1,
+            "Dry forest" = 2,
+            "Temperate forest" = 5,
+            "Tropical forest" = 6,
+            
+            "Alpine grassland" = 0,
+            "Continental grassland" = 1,
+            "Dry grassland" = 2,
+            "Temperate grassland" = 5,
+            "Tropical grassland" = 6,
+            "Polar grassland"= 7,
+            
+            "Continental shrubland" = 1,
+            "Dry shrubland" = 2,
+            "Temperate shrubland" = 5,
+            
+            "Alpine desert"= 0,
+            "Continental desert" = 1,
+            "Dry desert" = 2,
+            "Temperate desert" = 5
+)
+
+df_pick<-cbind(env,df1)
+res1<-adonis2(dist ~ Biome, data=env, permutation=999)
+pval1<-res1$"Pr(>F)"
+if (pval1[1] < 0.05) {
+  ecolb <- paste("PERMANOVA:", sprintf('italic(p) < %.2f', 0.05), sep=" ")
+} else {
+  ecolb <- paste("PERMANOVA:", sprintf('italic(p) = %.2f', round(pval1[1], 2)), sep=" ")
+}
+mytheme <-  theme(
+    plot.title = element_text(size = 9, hjust = 0.5, lineheight = 0.9, colour = "black"), 
+    panel.border = element_rect(colour = "black", fill = NA, size = 0.2),  
+    strip.text = element_blank(),  
+    strip.background = element_blank(),  
+    axis.text.x = element_text(colour = "black", size = 9),  
+    axis.text.y = element_text(colour = "black", size = 9),  
+    axis.ticks = element_line(colour = "black", size = 0.2),  
+    axis.title = element_text(size = 9),  
+    legend.text = element_text(size = 9),  
+    legend.title = element_blank(),  
+    legend.background = element_blank(),  
+    legend.key = element_blank(),  
+    plot.margin = unit(c(2, 0, 0, 1), "lines"),  
+    panel.grid = element_blank()  
+  )
+p <- ggplot(df_pick, aes(x, y, color = Biome, shape = Biome)) +
+  geom_point(size = 1, stroke = 0.3) + 
+  labs(
+    x = paste("PCoA axis 1 (", a, "%)", sep = ""), 
+    y = paste("PCoA axis 2 (", b, "%)", sep = "")
+  ) +
+  scale_color_manual(values = colors) + 
+  scale_shape_manual(values = shapes) +
+  coord_cartesian(ylim = c(-0.45, 0.3), xlim = c(-0.3, 0.4), expand = TRUE) + 
+  mytheme +   theme(
+    legend.text = element_text(lineheight = 0.2),  
+    legend.key.height = unit(0.2, "cm"), 
+    legend.position = "right",
+    legend.direction = "horizontal" 
+  ) +
+  guides(color = guide_legend(nrow = 12), shape = guide_legend(nrow = 12))
+p
+################################################################################################ Pairwise PERMANOVA###############
+library(RVAideMemoire)
+library(vegan)
+otu <- read.csv("nifH_otu_rare_40.csv", header = TRUE, row.names = 1)
+dist <- vegdist(otu, method = "bray", binary = FALSE)
+env <- read.csv("nifH_env.csv", row.names = 1, header = TRUE, check.names = FALSE)
+env$Biome <- as.factor(env$Biome)
+result <- pairwise.perm.manova(dist, env$Biome, nperm = 999, test = "Pillai", p.method = "fdr", F = TRUE, R2 = TRUE)
+p_value_matrix <- result$p.value 
+F_value_matrix <- result$F.value       
+R2_value_matrix <- result$R2.value    
+convert_to_table <- function(p_mat, F_mat, R2_mat) 
+  row_names <- rownames(p_mat)
+  col_names <- colnames(p_mat)
+  comparisons <- expand.grid(row_names, col_names)
+  p_values <- as.vector(p_mat)
+  F_values <- as.vector(F_mat)
+  R2_values <- as.vector(R2_mat)
+  comparison_table <- data.frame(
+    Comparison = paste(comparisons$Var1, "vs", comparisons$Var2),  
+    p_value = p_values,                                            
+    F_value = F_values,                                                                                    
+  )
+  comparison_table <- na.omit(comparison_table)
+  return(comparison_table)
+}
+result_table <- convert_to_table(p_value_matrix, F_value_matrix, R2_value_matrix)
+print(result_table)
+result_df <- as.data.frame(p_value_matrix)
+stat_df <- as.data.frame(stat_matrix)
+write.csv(result_df, "permanova_p_values.csv")
+write.csv(stat_df, "permanova_stats.csv")
+write.csv(result_table, "permanova_with_F_R2.csv", row.names = FALSE)
