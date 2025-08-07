@@ -1,6 +1,5 @@
 library(ggmap)
 library(maps)
-##map
 ext_data <- read.csv( "global+china_env.csv", row.names = 1, check.names = F)
 d0 <- ext_data
 d0$Biome <- factor(d0$Biome, levels = c("Alpine cropland",
