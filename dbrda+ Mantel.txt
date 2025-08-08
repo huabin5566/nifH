@@ -129,3 +129,28 @@ library(UpSetVP)
 p<-upset_vp(mod, plot.hp=TRUE, order.part="degree")
 p
 ggsave("rda_vp1.pdf",width = 10, height = 6, dpi = 300)
+
+
+
+###### Mantel test
+library(ggplot2)
+library(dplyr)
+library(openxlsx)
+otu_beta = read.csv("global+china_40.csv",header = T,row.names = 1,check.names = F)
+
+env1 = read.csv("global+china_env.csv",1,row.names = 1)
+colnames(env1)
+envx<-env1[,c(9:14,18,19)]
+env <- envx[complete.cases(envx), ]otu_beta <- otu_beta[rownames(otu_beta) %in% rownames(env),]
+str(env)
+# Mantel test
+mantel = mantel_test(
+  spec = otu_beta, env = env,
+  spec_dist =  dist_func(.FUN = "vegdist", method = "bray"), #
+  env_dist = dist_func(.FUN = "vegdist", method = "euclidean"),
+  mantel_fun = 'mantel', 
+  na_omit=TRUE,
+)
+mantel # 
+mantel$P_adj_BH <- p.adjust(mantel$p, method = 'BH')#矫正P
+write.csv(mantel,"mantel.csv")
