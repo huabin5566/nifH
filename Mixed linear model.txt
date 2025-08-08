@@ -22,33 +22,88 @@ library(ggplot2)
 library(data.table)
 library(scales)
 
-envc<-read.csv(file = "nifH_env.csv",header = T,row.names = 1)
-env1<-envc[,10:16]
-head(env1)
+#read file
+envc<-read.csv(file = "global+china_env.csv",header = T,row.names = 1)
+
+envc$site<-factor(envc$site)
+colnames(envc)
+env1<-envc[,9:22]
+env1$Clay.Silt <- as.numeric(env1$Clay.Silt)
+env1$logNDVI <- as.numeric(env1$logNDVI)
 env.scale<-scale(env1)
+str(env1)
 colnames(env1) <- paste0("raw_", colnames(env1))
-envsc<-cbind(envc[,c(1:9,17:19)],env.scale,env1)
+
+envsc<-cbind(envc[,c(1:8,23:42)],env.scale,env1)
 envsc<-na.omit(envsc)
 head(envsc)
+str(envsc)
 
-gm1<-lmer(pcoa1 ~ MAP + MAT + NDVI + pH  + T_OC+ TN +T_SILT +(1|site),
+
+#建立模型T_
+
+
+gm1<-lmer(logabundance ~  AI+MAP + MAT + pH + NDVI + TOC+ TN+Clay.Silt  +(1|site),
+          data=envsc)
+gm2<-lmer(Richness ~   AI+MAP + MAT + pH + NDVI + TOC+ TN+ Clay.Silt +(1|site),
+          data=envsc)
+gm3<-lmer(pd ~    AI+MAP + MAT + pH + NDVI + TOC+ TN+ Clay.Silt  +(1|site),
+          data=envsc)
+gm4<-lmer(pcoa1 ~  AI+MAP + MAT + pH + NDVI + TOC+ TN+ Clay.Silt  +(1|site),
+          data=envsc)
+gm5<-lmer(du1 ~  AI+MAP + MAT + pH + NDVI + TOC+ TN+ Clay.Silt  +(1|site),
+          data=envsc)
+gm6<-lmer(dW1 ~  AI+MAP + MAT + pH + NDVI + TOC+ TN+ Clay.Silt  +(1|site),
           data=envsc)
 summary(gm1)
 tab_model(gm1)
-
-gm2<-lmer(Richness ~  MAP + MAT + NDVI + pH  + T_OC+ TN +T_SILT +(1|site),
-           data=envsc)
 summary(gm2)
 tab_model(gm2)
-
-gm3<-lmer(logabundance ~  MAP + MAT + NDVI + pH  + T_OC+ TN +T_SILT +(1|site),
-          data=envsc)
 summary(gm3)
 tab_model(gm3)
+summary(gm4)
+tab_model(gm4)
+summary(gm5)
+tab_model(gm5)
+summary(gm6)
+tab_model(gm6)
+vif(gm1)
+vif(gm2)
+vif(gm3)
+vif(gm4)
+vif(gm5)
+vif(gm6)
+#####正态检验######
+# 提取残差
+residuals_gm5 <- residuals(gm5)
+
+# 绘制基础QQ图
+qqnorm(residuals_gm5)
+qqline(residuals_gm5, col = "red")
+
+# 使用car包的QQ图(需要先安装car包)
+library(car)
+
+p = qqPlot(residuals_gm5, main = "QQ Plot of Model Residuals")
+
+# Shapiro-Wilk检验
+shapiro_result <- shapiro.test(residuals_gm5)
+print(shapiro_result)
+
+# 结果解释
+if(shapiro_result$p.value > 0.05) {
+  message("残差服从正态分布(p = ", round(shapiro_result$p.value, 4), ")")
+} else {
+  message("残差不服从正态分布(p = ", round(shapiro_result$p.value, 4), ")")
+}
+###### variance decomposition
 options(warn=-1)
 hp1 <- glmm.hp(gm1)
 hp2 <- glmm.hp(gm2)
 hp3 <- glmm.hp(gm3)
+hp4 <- glmm.hp(gm4)
+hp5 <- glmm.hp(gm5)
+hp6 <- glmm.hp(gm6)
 
 source("individual_plot.R")
 pdf("plots_output8.pdf", width = 80/25.4, height = 50/25.4)
