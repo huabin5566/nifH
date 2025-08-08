@@ -1,0 +1,131 @@
+##dbrda############################################################################################################################################
+library(vegan) # for multivariable analysis
+library(ape) # for pcoa 
+library(ggplot2) # for graphing
+library(RColorBrewer) # for color bar
+library(plyr) # for rename
+library(dplyr)
+
+asv<-read.csv("global+china_40.csv",header = T,row.names = 1,check.names = F)
+env0<-read.csv("global+china_env.csv",header=TRUE,row.names = 1)
+env0$Biome<-factor(env0$Biome)
+env0$site<-factor(env0$site)
+env0$AI <- as.numeric(env0$AI)
+env0$Clay.Silt <- as.numeric(env0$Clay.Silt)
+colnames(env0)
+env<-env0[,c(9:14,18,19)]
+envx <- env[complete.cases(env), ]#去掉NA样品
+
+str(env0)
+
+asv <- asv[rownames(asv) %in% rownames(envx),]#筛选样品
+dist <- vegdist(asv, method="bray", binary=F, diag=1) 
+#################unifrac #################################################
+#read phylo.tree and match
+# phylo <- read.tree("nifH.tree")
+# str(phylo)
+# #prune tree
+# pruned_phylo <- prune.sample(asv, phylo)
+# str(pruned_phylo)
+# #write.tree(pruned_phylo,paste(data.set.name,"otu_phylo_pruned.tre", sep = "_"))
+# # calculate the unifrac
+# otu_tree<-midpoint(pruned_phylo)
+# otu_tree
+# unifracs <- GUniFrac(asv,otu_tree,alpha=c(0,0.5,1))$unifracs #otu.table with row = sample and column = OTU
+# # extract unifrac distance
+# dist <- as.dist(unifracs[, , "d_UW"])		# Unweighted UniFrac	
+
+#模型选择
+set.seed(123)
+bray.dbrda1<-dbrda(dist ~.,data=envx) #构建全模型
+mod1<-dbrda(dist~1,envx)
+ms1<-ordistep(mod1,scope=formula(bray.dbrda1), #模型选择
+              direction="forward",
+              permutations=how(nperm=999))
+ms1$call #最优模型
+
+
+#拟合最优模型
+df_otu_cca<-dbrda(formula = dist ~ ., data = envx)
+df_otu_cca.scaling1 <- summary(df_otu_cca, scaling = 1)
+summary(df_otu_cca)
+ anova(df_otu_cca,permutations=how(nperm=999),by="axis") #检验轴是否显著
+ anova(df_otu_cca,permutations=how(nperm=999),by="terms")#检验x是否显著
+
+
+#提取R2
+R2 <- RsquareAdj(df_otu_cca)
+df_otu_cca_noadj <- R2$r.squared  #原R2
+df_otu_cca_adj <- R2$adj.r.squared  #校正R2
+#计算校正 R2 后的约束轴解释率
+df_otu_cca_exp_adj <- df_otu_cca_adj * df_otu_cca$CCA$eig/sum(df_otu_cca$CCA$eig)
+CCA1 <- paste("dbRDA1 (",round(df_otu_cca_exp_adj[1]*100, 1),"%)")
+CCA2 <- paste("dbRDA2 (",round(df_otu_cca_exp_adj[2]*100, 1),"%)")
+
+
+#描述统计
+data<-summary(df_otu_cca)
+
+#每个环境因子显著性检验
+envxx<-envx #最优模型中的环境因子
+df_envfit <- envfit(df_otu_cca,envxx,permu=999)
+
+
+#数据处理
+cor_data<-data.frame(data$constr.chi/data$tot.chi, data$unconst.chi/data$tot.chi)
+cor_com <- data.frame(label=colnames(envxx),r=df_envfit$vectors$r,p=df_envfit$vectors$pvals)
+
+#cca图需画箭头的环境因子
+cor_com<-mutate(cor_com,
+                label=rownames(cor_com),
+                p.mark=p)
+
+dm<-dim(cor_com)
+dmx<-dm[1]
+for (i in 1:dmx){
+  if (cor_com$p[i] >= 0.1) cor_com$p.mark[i] <- "" else if (cor_com$p[i] >= 0.05 & cor_com$p[i] < 0.1)  cor_com$p.mark[i] <- "." else if (cor_com$p[i] >= 0.01 & cor_com$p[i] < 0.05)  cor_com$p.mark[i] <- "*" else if (cor_com$p[i] >= 0.001 & cor_com$p[i] < 0.01)  cor_com$p.mark[i] <- "**" else if (cor_com$p[i] < 0.001)  cor_com$p.mark[i] <- "***"}
+
+
+library(rdacca.hp)
+#mite.hel <- decostand(mite, method="hellinger")
+
+mod <- rdacca.hp(dist, envxx, method ="dbRDA", var.part=TRUE, type="adjR2",add=T)
+ccar2<-mod$Hier.part
+
+cor_com1<-cbind(cor_com,ccar2)
+cor_com1$label<-factor(cor_com1$label)
+
+
+r2<-as.character(as.expression(substitute("Total" ~~ italic (r)^2 ~ "=" ~r2,
+                                          list(r2=round(df_otu_cca_adj,3)))))
+parse(text=r2)
+p3 <- ggplot(cor_com1, aes(x = reorder(label, Individual), y = Individual)) +
+  geom_bar(width = 0.5, stat = "identity", color = "black", size = 0.2) + # 修改背景和条形颜色
+  geom_text(aes(y = Individual + 0.0005, label = cor_com1$p.mark, size = 9)) +
+  xlab("Explanatory factors") +
+  ylab(expression(r^"2")) +
+  annotate('text', label = r2, x = 2, y = 0.0065, size = 9, parse = TRUE) +
+  scale_y_continuous(
+    limits = c(0, NA),  # 设置y轴的限制
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  theme(
+    panel.grid = element_blank(), 
+    panel.border = element_rect(fill = NA, colour = 'black', size = 0.2), 
+    panel.background = element_rect(fill = '#FFFFFF'),
+    plot.title = element_text(size = 9, hjust = 0.5), 
+    plot.subtitle = element_text(size = 9, hjust = 0.5), 
+    axis.text = element_text(size = 9, color = 'black'), 
+    axis.title = element_text(size = 9, color = 'black'),
+    
+    axis.ticks = element_line(size = 0.2, color = "black"), 
+    legend.position = "none"
+  ) 
+p3
+ggsave("dbrda_全国外源du.pdf",width = 120, height = 100, units = "mm")
+
+
+library(UpSetVP)
+p<-upset_vp(mod, plot.hp=TRUE, order.part="degree")
+p
+ggsave("rda_vp1.pdf",width = 10, height = 6, dpi = 300)
