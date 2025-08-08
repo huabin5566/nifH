@@ -1,0 +1,483 @@
+###structural equation model for abundance, richness and composition########
+library(piecewiseSEM)
+library(lme4)
+library(nlme)
+library(lmerTest)
+library(dplyr)
+library(tidyverse)
+data0 <- read.csv("global+china_env.csv",row.names=1,header=T)
+colnames(data0)
+data1 <- data0[,c(7:14,16:40)]
+str(data1)
+data_scaled <- as.data.frame(scale(data1))
+data2 <- data0[,1:6]
+data3 <- cbind(data_scaled,data2)
+data<-na.omit(data3)
+sapply(data, class)
+mod.list1=psem(lme(pcoa1~ MAP +MAT +NDVI, random=~1|site,data= data, na.action=na.omit),
+               lme(Richness~AI +MAP +MAT +NDVI+Clay.Silt ,random=~1|site, data = data,na.action=na.omit),
+               lme(logabundance~ MAP +MAT +NDVI, random=~1|site, data = data, na.action=na.omit),
+               
+               lme(NDVI~AI +MAP +MAT +Clay.Silt + pH +TN+TOC , random=~1|site,data=data, na.action=na.omit),
+               
+               lme(pH~AI+MAP, random=~1|site,data=data, na.action=na.omit),
+               lme(Clay.Silt~AI+MAP+MAT, random=~1|site,data=data, na.action=na.omit),
+               lme(TN~AI+MAP+MAT, random=~1|site,data=data, na.action=na.omit),
+               #lme(TOC~AI+MAP+MAT, random=~1|site,data=data, na.action=na.omit),
+               
+               pcoa1%~~%Richness,
+               logabundance %~~%Richness,
+               logabundance %~~%pcoa1,
+               
+               TN %~~%TOC,
+               pH %~~%TN,
+               Clay.Silt %~~%TN,
+               Clay.Silt %~~%TOC,
+               Clay.Silt %~~%pH,
+               data= data
+)
+summary(mod.list1,conserve = TRUE)
+AIC(mod.list1)
+###structural equation model for SES########
+##
+data0 <- read.csv("global+china_env.csv",row.names=1,header=T)
+colnames(data0)
+se <- function(x, na.rm = FALSE) {
+  sd(x, na.rm = na.rm) / sqrt(sum(!is.na(x)))
+}
+
+df_Richness <- data0 %>%
+  group_by(site) %>%
+  dplyr::summarise(Richnessvalue = mean(Richness, na.rm = TRUE),
+                   Richnessvalue_SE = se(Richness, na.rm = TRUE)
+  )   
+
+df_Relative_abundance <- data0 %>%
+  group_by(site) %>%
+  dplyr::summarise(Relative_abundancevalue = mean(Relative_abundance, na.rm = TRUE),
+                   Relative_abundancevalue_SE = se(Relative_abundance, na.rm = TRUE)
+  )   
+
+df_pcoa1 <- data0 %>%
+  group_by(site) %>%
+  dplyr::summarise(pcoa1value = mean(pcoa1, na.rm = TRUE),
+                   pcoa1value_SE = se(pcoa1, na.rm = TRUE)
+  )   
+
+df_Richness <- merge(df_Richness,df_Relative_abundance, by = "site")
+df_Richness <- merge(df_Richness,df_pcoa1, by = "site")
+write.csv(df_Richness, "site_均值.csv")
+
+
+
+df_AI <- data0 %>%
+  group_by(site) %>%
+  dplyr::summarise(AIvalue = mean(AI, na.rm = TRUE),
+                   AIvalue_SE = se(AI, na.rm = TRUE)
+  )   
+
+
+
+df_MAP <- data0 %>%
+  group_by(site) %>%
+  dplyr::summarise(MAPvalue = mean(MAP, na.rm = TRUE),
+                   MAPvalue_SE = se(MAP, na.rm = TRUE)
+  )   
+
+
+
+df_MAT <- data0 %>%
+  group_by(site) %>%
+  dplyr::summarise(MATvalue = mean(MAT, na.rm = TRUE),
+                   MATvalue_SE = se(MAT, na.rm = TRUE)
+  )   
+
+
+df_NDVI0 <- data0 %>%
+  group_by(site) %>%
+  dplyr::summarise(NDVI0value = mean(NDVI0, na.rm = TRUE),
+                   NDVI0value_SE = se(NDVI0, na.rm = TRUE)
+  )   
+
+df_NDVI <- data0 %>%
+  group_by(site) %>%
+  dplyr::summarise(NDVIvalue = mean(NDVI, na.rm = TRUE),
+                   NDVIvalue_SE = se(NDVI, na.rm = TRUE)
+  )   
+
+df_pH <- data0 %>%
+  group_by(site) %>%
+  dplyr::summarise(pHvalue = mean(pH, na.rm = TRUE),
+                   pHvalue_SE = se(pH, na.rm = TRUE)
+  )   
+
+
+
+df_TOC <- data0 %>%
+  group_by(site) %>%
+  dplyr::summarise(TOCvalue = mean(TOC, na.rm = TRUE),
+                   TOCvalue_SE = se(TOC, na.rm = TRUE)
+  )   
+
+
+df_Clay.Silt <- data0 %>%
+  group_by(site) %>%
+  dplyr::summarise(Clay.Siltvalue = mean(Clay.Silt, na.rm = TRUE),
+                   Clay.Siltvalue_SE = se(Clay.Silt, na.rm = TRUE)
+  )   
+
+df_TN <- data0 %>%
+  group_by(site) %>%
+  dplyr::summarise(TNvalue = mean(TN, na.rm = TRUE),
+                   TNvalue_SE = se(TN, na.rm = TRUE)
+  )   
+
+
+
+ext_data <- read.csv("SES_site均值.csv",  check.names = FALSE)
+
+data_value <- merge(ext_data,df_AI, by = "site")
+data_value <- merge(data_value,df_MAP, by = "site")
+data_value <- merge(data_value,df_MAT, by = "site")
+data_value <- merge(data_value,df_NDVI0, by = "site")
+data_value <- merge(data_value,df_NDVI, by = "site")
+data_value <- merge(data_value,df_pH, by = "site")
+data_value <- merge(data_value,df_TOC, by = "site")
+data_value <- merge(data_value,df_Clay.Silt, by = "site")
+data_value <- merge(data_value,df_TN, by = "site")
+write.csv(data_value, "site均值.csv")
+
+library(piecewiseSEM)
+library(lme4)
+library(nlme)
+library(lmerTest)
+library(dplyr)
+library(tidyverse)
+
+
+data0 <- read.csv("site均值.csv",header=T)
+colnames(data0)
+data1 <- data0[,c(2,3,5:22)]
+str(data1)
+data_scaled <- as.data.frame(scale(data1))
+data2 <- data0[,c(1,4)]
+data3 <- cbind(data_scaled,data2)
+data<-na.omit(data3)
+sapply(data, class)
+
+
+
+#chart.Correlation(data_scaled, histogram=TRUE, pch=19)
+
+mod.list1=psem(lme(SES~ MATvalue +MAPvalue +AIvalue, random=~1|site,data= data, na.action=na.omit),
+               
+               
+               lme(NDVIvalue~MATvalue +MAPvalue +AIvalue + pHvalue +TNvalue+TOCvalue , random=~1|site,data=data, na.action=na.omit),
+               
+               lme(pHvalue~MAPvalue+MATvalue, random=~1|site,data=data, na.action=na.omit),
+               lme(Clay.Siltvalue~MAPvalue, random=~1|site,data=data, na.action=na.omit),
+               lme(TNvalue~MAPvalue+MATvalue, random=~1|site,data=data, na.action=na.omit),
+               lme(TOCvalue~MAPvalue+MATvalue, random=~1|site,data=data, na.action=na.omit),
+               
+               
+               TNvalue %~~%TOCvalue,
+               pHvalue %~~%TOCvalue,
+               Clay.Siltvalue %~~%pHvalue,
+               
+               data= data
+)
+summary(mod.list1,conserve = TRUE)
+AIC(mod.list1)
+
+
+###################################分别计算所需直接效应与简介效应################################
+#提取计算数据
+kk1 <- summary(mod.list01, .progressBar = F)
+kk2 <- kk1$coefficients[,-(3:6)]
+kk3 <- as.data.frame(kk2)
+kk4 <- kk3[!grepl("~~", kk3$Predictor), ]
+kk4
+
+# 结果整理为便于计算的数据框
+result1 <- kk4 %>%
+  dplyr::relocate(
+    from   = Predictor,
+    to     = Response,
+    weight = Std.Estimate,
+    p      = P.Value
+  )
+#查看整理后结果
+result1  
+
+#开始计算
+#===========================直接效应============================
+
+data <-result1 
+
+# 定义计算直接效应的函数
+calculateDirectEffects <- function(data, factors) {
+  # 初始化直接效应向量
+  direct_effects <- numeric(nrow(data))
+  
+  # 遍历数据集中的每一行
+  for (i in 1:nrow(data)) {
+    # 检查路径是否在因子列表中，如果是则直接效应即为weight值，否则为0
+    if (paste(data$from[i], data$to[i], sep = "_") %in% factors) {
+      direct_effects[i] <- data$weight[i]
+    } else {
+      direct_effects[i] <- 0
+    }
+  }
+  
+  # 过滤 Direct_Effect 等于 0 的行
+  non_zero_rows <- direct_effects != 0
+  direct_effects <- direct_effects[non_zero_rows]
+  from_to <- paste(data$from[non_zero_rows], "→", data$to[non_zero_rows])
+  
+  # 创建包含直接效应的数据框
+  direct_effects_df <- data.frame(
+    from_to = from_to,
+    Direct_Effect = direct_effects
+  )
+  
+  return(direct_effects_df)
+}
+
+
+# 定义因子列表
+# 自动化生成直接效应的因子列表的函数
+generateDirectEffectFactors <- function(data) {
+  # 从数据集中获取唯一的 from 和 to 组合，符合直接效应的条件
+  unique_direct_combinations <- unique(paste(data$from, data$to, sep = "_"))
+  
+  # 提取起点和终点
+  from_factors <- unique(data$from)
+  to_factors <- unique(data$to)
+  
+  # 拆分因子并转换为向量
+  direct_factors <- paste(rep(from_factors, each = length(to_factors)), rep(to_factors, length(from_factors)), sep = "_")
+  
+  return(direct_factors)
+}
+
+# 调用函数生成直接效应的因子列表
+direct_factors <- generateDirectEffectFactors(data)
+
+# 调用函数计算直接效应
+direct_effects_result <- calculateDirectEffects(data, direct_factors)
+
+print(direct_effects_result)
+
+#==========================================间接效应==========================================
+
+data <- result1  
+
+# 从数据中生成路径列表
+unique_from <- unique(data$from)
+unique_to <- unique(data$to)
+paths <- expand.grid(from = unique_from, to = unique_to)
+paths <- split(paths, seq(nrow(paths)))
+paths <- lapply(paths, function(x) c(as.character(x$from), as.character(x$to), "pcoa1"))
+
+# 定义计算间接效应的函数
+calculateIndirectEffects <- function(data, from_factor, through_factor, to_factor) {
+  through_weight <- data$weight[data$from == from_factor & data$to == through_factor]
+  to_weight <- data$weight[data$from == through_factor & data$to == to_factor]
+  
+  if (length(through_weight) == 0 | length(to_weight) == 0) {
+    message(paste("Skipping invalid path:", from_factor, "→", through_factor, "→", to_factor))
+    return(NULL)
+  }
+  
+  indirect_effect <- through_weight * to_weight
+  
+  return(indirect_effect)
+}
+
+# 创建空的数据框来存储间接效应结果
+indirect_effects_df <- data.frame(from_to = character(), Indirect_Effect = numeric())
+
+# 循环计算间接效应并存储结果
+for (path in paths) {
+  from_factor <- path[1]
+  through_factor <- path[2]
+  to_factor <- path[3]
+  
+  indirect_effect <- calculateIndirectEffects(data, from_factor, through_factor, to_factor)
+  if (!is.null(indirect_effect)) {
+    from_to <- paste(from_factor, through_factor, to_factor, sep = " → ")
+    indirect_effects_df <- rbind(indirect_effects_df, data.frame(from_to = from_to, Indirect_Effect = indirect_effect))
+  }
+}
+
+# 打印结果
+print(indirect_effects_df)
+
+#然后将间接效应的和求出来
+# 创建示例数据框
+indirect_effects_df <- indirect_effects_df
+
+# 定义自动化函数
+calculate_total_indirect_effect <- function(data) {
+  # 提取开头和结尾相同的值，并对其"Indirect_Effect"列求和
+  total_indirect_effect <- data %>%
+    mutate(
+      start_pattern = sub(" → .*", "", from_to),
+      end_pattern = sub(".* → ", "", from_to)
+    ) %>%
+    group_by(start_pattern, end_pattern) %>%
+    summarise(total_indirect_effect = sum(Indirect_Effect), .groups = "drop") %>%
+    ungroup() %>%
+    arrange(start_pattern, end_pattern) %>%
+    mutate(from_to = paste0(start_pattern, " → ", end_pattern)) %>%
+    select(from_to, total_indirect_effect)
+  
+  return(total_indirect_effect)
+}
+
+# 调用自动化函数并打印结果
+result_total_indirect_effect <- calculate_total_indirect_effect(indirect_effects_df)
+print(result_total_indirect_effect)
+
+#提取三个主要结果
+print(direct_effects_result)
+print(indirect_effects_df)
+print(result_total_indirect_effect)
+
+#合并三个结果
+# 直接效应数据框
+direct_effects_result <- direct_effects_result
+
+# 间接效应数据框
+indirect_effects_df <- indirect_effects_df
+# 总间接效应数据框
+total_indirect_effect_df <- as.data.frame(result_total_indirect_effect)
+
+# 合并直接效应和间接效应数据框
+total_effects_df <- bind_rows(direct_effects_result, indirect_effects_df, total_indirect_effect_df)
+
+# 打印结果
+print(total_effects_df)
+
+# 创建数据框
+data <- total_effects_df
+
+# 使用dplyr包中的group_by和summarise函数，将相同因子的数据转移到相同行并求和
+data_processed <- data %>%
+  group_by(from_to) %>%
+  summarise(Direct_Effect = sum(Direct_Effect, na.rm = TRUE),
+            Indirect_Effect = sum(Indirect_Effect, na.rm = TRUE),
+            total_indirect_effect = sum(total_indirect_effect, na.rm = TRUE))
+
+# 打印处理后的数据框
+print(data_processed)
+
+
+# 使用dplyr包中的mutate函数，将Direct_Effect和total_indirect_effect列求和
+data_processed2 <- data_processed %>%
+  mutate(Total_Effect = Direct_Effect + total_indirect_effect)
+
+# 打印处理后的数据框
+print(data_processed2)
+
+# 过滤不需要的路径，我们的目标因子是TRAD，所以我们不需要那些中间路径的值
+df_filtered1 <- data_processed2 %>%
+  filter(grepl("pcoa1$", from_to))
+
+# 输出结果
+df_filtered1
+
+
+# 将其转换为数据框
+data_frame <- as.data.frame(df_filtered1)
+
+# 使用dplyr的过滤函数来保留只有一条箭头路径的数据
+filtered_data1 <- data_frame %>%
+  filter(Indirect_Effect == 0)
+
+# 打印筛选后的数据
+print(filtered_data1)
+
+#整理绘图数据
+filtered_data2 <- filtered_data1[,-(3)]
+filtered_data2
+
+
+# 假设您的数据框名为data_frame，将其转换为数据框（如果不是数据框的话）
+data_frame <- as.data.frame(filtered_data2)
+
+# 使用正则表达式提取箭头前的字母部分，并创建新列from_to_clean
+data_frame$from_to_clean <- sub(" .*", "", data_frame$from_to)
+
+# 打印处理后的数据框，只包含箭头前的字母部分
+kk4 <- print(data_frame[, c("from_to_clean", "Direct_Effect", "total_indirect_effect", "Total_Effect")])
+kk4 
+
+#开始绘图
+# 导入所需的包
+library(ggplot2)
+
+# 假设您的数据框名为data_frame，将其转换为数据框（如果不是数据框的话）
+data_frame <- as.data.frame(kk4 )
+
+# 使用pivot_longer函数将数据框转换为长格式
+data_long <- pivot_longer(data_frame, 
+                          cols = c(Direct_Effect, total_indirect_effect, Total_Effect),
+                          names_to = "Effect_Type", 
+                          values_to = "Effect_Value")
+
+# 定义X轴的顺序
+data_long$from_to_clean <- factor(data_long$from_to_clean,
+                                  levels = c("NDVI","MAP","MAT","TN","TP","PH","SILT"))
+# 设置因子变量，并指定顺序
+data_long$Effect_Type <- factor(data_long$Effect_Type,
+                                levels = c("Direct_Effect", "total_indirect_effect", "Total_Effect"))
+
+
+# 创建柱状图
+p <- ggplot(data_long, aes(x = from_to_clean, y = Effect_Value)) +
+  geom_bar(aes(fill = Effect_Type), stat = "identity", color = "black", size = 0.2,
+           position = position_dodge(width = 0.7), width = 0.7) +
+  
+  # 设置 y 轴范围、扩展比例和刻度
+  scale_y_continuous(
+    limits = c(NA, NA),  # y轴从0开始，NA表示自动计算最大值
+    expand = c(0.02, 0.02),  # 在 y 轴上下各留出2%的空白
+    breaks = seq(-0.7, 0.7, 0.2)  # 设置 y 轴的刻度
+  ) +
+  
+  # 设置柱形图的填充颜色
+  scale_fill_manual(
+    values = c("#BD6263", "#F5AE6B", "#4387B5"),
+    breaks = c("Direct_Effect", "total_indirect_effect", "Total_Effect")
+  ) +
+  
+  # 使用主题 classic 并自定义主题元素
+  theme_classic() +
+  theme(
+    panel.grid = element_blank(), 
+    #panel.border = element_rect(fill = NA, colour = 'black', size = 0.2),  # 调整图形边框线条宽度
+    panel.background = element_rect(fill = '#FFFFFF'),
+    plot.title = element_text(size = 7, hjust = 0.5), 
+    plot.subtitle = element_text(size = 7, hjust = 0.5), 
+    axis.text = element_text(size = 7, color = 'black'), 
+    axis.title = element_text(size = 7, color = 'black'),
+    axis.text.x = element_text(angle = 0, hjust = 1),  # x轴文字垂直显示
+    axis.ticks = element_line(size = 0.2, color = "black"),  # 调整刻度线宽度
+    axis.line.x = element_line(size = 0.2, color = "black"),  # 调整x轴线条粗细
+    axis.line.y = element_line(size = 0.2, color = "black"),   # 调整y轴线条粗细
+    legend.position = "bottom"
+  ) +
+  
+  # 添加y=0的实线
+  geom_hline(yintercept = 0, linetype = "solid", color = "black", size = 0.2) +
+  
+  # 添加标签
+  labs(x = NULL, y = "Standardized effect on Richness")
+
+# 显示图形
+print(p)
+
+# 保存图形为PDF格式
+write.csv(kk4, "pcoa1.csv")
+ggsave("pc.pdf", plot = p, width = 80, height = 60, units = "mm")
